@@ -332,15 +332,15 @@ server <- function(input, output) {
   }) 
   
   output$pt.dir.plot <- renderPlot({
-    dir.plot
+    pt.dir.plot
   })
   
   output$pt.bar.plot <- renderPlot({
-    bar.plot
+    pt.bar.plot
   }) 
   
   output$pt.rose <- renderPlot({
-    rose
+    pt.rose
   })
   
   output$weather.plot <- renderPlot({
