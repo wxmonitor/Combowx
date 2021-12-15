@@ -191,9 +191,29 @@ d.weather.page <- fromJSON(url, flatten = TRUE)
 hourly.forecast <- data.frame(d.weather.page$hourly)
 hourly.forecast$dt <- as.POSIXct(hourly.forecast$dt, origin="1970-01-01")
 
+current <- data.frame(d.weather.page$current)
+current$dt <- as.POSIXct(current$dt, origin="1970-01-01")
+current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
+current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
+
+current <- current %>%
+  mutate(wind_speed = wind_speed * 0.868976) %>%
+  mutate(wind_gust = wind_gust * 0.868976)
+
 hourly.forecast <- hourly.forecast %>%
   mutate(wind_speed = wind_speed * 0.868976) %>%
   mutate(wind_gust = wind_gust * 0.868976)
+
+d.rose <- ggplot(current, aes(x = wind_deg)) +
+  coord_polar(theta = "x", start = 0, direction = 1) +
+  geom_histogram(fill = "red", color = "gray10", bins = 30) +
+  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
+                     labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.title = element_blank())
 
 d.dir.plot <- ggplot(hourly.forecast, aes(x = dt)) + 
   geom_point(aes(y = wind.rose(wind_deg)), size = 1) +
@@ -243,6 +263,9 @@ ui <- tabsetPanel(
              h1("Disco Bay Weather", align = "center"),
              h3("48 hour forecast", align = "center"),
              h4(textOutput("d.time.current"), align = "center"),
+             h4(textOutput("d.weather.label"), align = "center"),
+             fluidRow(column(12, align = "center",
+              plotOutput(outputId = "d.rose", width = "50%", height = "200px"))),
              plotOutput(outputId = "d.weather.plot", width = "100%", height = "400px"),
              plotOutput(outputId = "d.dir.plot", width = "100%", height = "400px"),
              plotOutput(outputId = "d.rain.plot", width = "100%", height = "400px"),
@@ -280,6 +303,13 @@ ui <- tabsetPanel(
 
 server <- function(input, output) {
   
+  output$d.weather.label <- renderText({
+    paste0(wind.rose(current$wind_deg), " ",
+           round(current$wind_speed, 0), " knots ",
+           "(", current$wind_deg, "°)")
+    
+  }) 
+  
   output$d.weather.plot <- renderPlot({
     d.weather.plot
   }) 
@@ -301,6 +331,10 @@ server <- function(input, output) {
   
   output$d.bar.plot <- renderPlot({
     d.bar.plot
+  }) 
+  
+  output$d.rose <- renderPlot({
+    d.rose
   }) 
   
   output$pt.weather.plot <- renderPlot({
