@@ -245,10 +245,10 @@ ui <- navbarPage("WX Monitor",
                       h4(textOutput("d.time.current"), align = "center"),
       
                       mainPanel(
-                        plotOutput(outputId = "d.weather.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "d.dir.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "d.rain.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "d.bar.plot", width = "120%", height = "400px")
+                        plotOutput(outputId = "d.weather.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "d.dir.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "d.rain.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "d.bar.plot", width = "110%", height = "400px")
                         )
                       )
                     ),
@@ -262,9 +262,9 @@ ui <- navbarPage("WX Monitor",
                       mainPanel(
                         fluidRow(column(12, align = "center",
                         plotOutput(outputId = "pt.rose", width = "50%", height = "200px"))),
-                        plotOutput(outputId = "pt.weather.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "pt.dir.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "pt.bar.plot", width = "120%", height = "400px")
+                        plotOutput(outputId = "pt.weather.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "pt.dir.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "pt.bar.plot", width = "110%", height = "400px")
                       )
                     )
                   ),
@@ -278,9 +278,9 @@ ui <- navbarPage("WX Monitor",
                       mainPanel(
                         fluidRow(column(12, align = "center",
                         plotOutput(outputId = "rose", width = "50%", height = "200px"))),
-                        plotOutput(outputId = "weather.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "dir.plot", width = "120%", height = "400px"),
-                        plotOutput(outputId = "bar.plot", width = "120%", height = "400px")
+                        plotOutput(outputId = "weather.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "dir.plot", width = "110%", height = "400px"),
+                        plotOutput(outputId = "bar.plot", width = "110%", height = "400px")
                       )
                     )
                   )
