@@ -229,7 +229,7 @@ d.rain.plot <- ggplot(hourly.forecast, aes(x = dt)) +
   geom_text(aes(y = rain.1h/5, label = rain.1h), size = 2.5, vjust = -0.5) +
   theme_bw() +
   labs(
-    title = "**Chance of Rain** and <span style='color:#28d0eb;'>**Accumulation**</span></span> (mm/hr)") +
+    title = "**Chance of Rain** and <span style='color:#28d0eb;'>**Accumulation**</span></span> (mm)") +
   theme(plot.title = element_markdown()) +
   ylab("Percent") + 
   xlab("") +
@@ -237,53 +237,44 @@ d.rain.plot <- ggplot(hourly.forecast, aes(x = dt)) +
   coord_cartesian(ylim = c(0,1))
 
 
-ui <- navbarPage("WX Monitor",
-           tabPanel("Disco Bay",
-                    fluidPage(
-                      h1("Disco Bay Weather", align = "center"),
-                      h3("48 hour forecast", align = "center"),
-                      h4(textOutput("d.time.current"), align = "center"),
-      
-                      mainPanel(
-                        plotOutput(outputId = "d.weather.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "d.dir.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "d.rain.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "d.bar.plot", width = "110%", height = "400px")
-                        )
-                      )
-                    ),
-           tabPanel("PT Ferry",
-                    fluidPage(
-                      h1("Port Townsend Ferry Dock Weather", align = "center"),
-                      h4(textOutput("pt.time.current"), align = "center"),
-                      h4(textOutput("pt.time.label"), align = "center"),
-                      h4(textOutput("pt.weather.label"), align = "center"),
-                      
-                      mainPanel(
-                        fluidRow(column(12, align = "center",
-                        plotOutput(outputId = "pt.rose", width = "50%", height = "200px"))),
-                        plotOutput(outputId = "pt.weather.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "pt.dir.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "pt.bar.plot", width = "110%", height = "400px")
-                      )
-                    )
-                  ),
-           tabPanel("Ediz Hook",
-                    fluidPage(
-                      h1("Ediz Hook Weather", align = "center"),
-                      h4(textOutput("time.current"), align = "center"),
-                      h4(textOutput("time.label"), align = "center"),
-                      h4(textOutput("weather.label"), align = "center"),
-                      
-                      mainPanel(
-                        fluidRow(column(12, align = "center",
-                        plotOutput(outputId = "rose", width = "50%", height = "200px"))),
-                        plotOutput(outputId = "weather.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "dir.plot", width = "110%", height = "400px"),
-                        plotOutput(outputId = "bar.plot", width = "110%", height = "400px")
-                      )
-                    )
-                  )
+ui <- tabsetPanel(
+  tabPanel("Disco Bay",
+           fluidPage(
+             h1("Disco Bay Weather", align = "center"),
+             h3("48 hour forecast", align = "center"),
+             h4(textOutput("d.time.current"), align = "center"),
+             plotOutput(outputId = "d.weather.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "d.dir.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "d.rain.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "d.bar.plot", width = "100%", height = "400px")
+           )
+  ),
+  tabPanel("PT Ferry",
+           fluidPage(
+             h1("Port Townsend Ferry Dock Weather", align = "center"),
+             h4(textOutput("pt.time.current"), align = "center"),
+             h4(textOutput("pt.time.label"), align = "center"),
+             h4(textOutput("pt.weather.label"), align = "center"),
+             fluidRow(column(12, align = "center",
+              plotOutput(outputId = "pt.rose", width = "50%", height = "200px"))),
+             plotOutput(outputId = "pt.weather.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "pt.dir.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "pt.bar.plot", width = "100%", height = "400px")
+           )
+  ),
+  tabPanel("Ediz Hook",
+           fluidPage(
+             h1("Ediz Hook Weather", align = "center"),
+             h4(textOutput("time.current"), align = "center"),
+             h4(textOutput("time.label"), align = "center"),
+             h4(textOutput("weather.label"), align = "center"),
+             fluidRow(column(12, align = "center",
+              plotOutput(outputId = "rose", width = "50%", height = "200px"))),
+             plotOutput(outputId = "weather.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "dir.plot", width = "100%", height = "400px"),
+             plotOutput(outputId = "bar.plot", width = "100%", height = "400px")
+           )
+  )
 )
 
 
