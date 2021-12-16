@@ -18,6 +18,111 @@ wind.rose <- function(x) {
 }
 
 
+# Disco Bay chunk - runs first to get sunrise/sunset data
+
+url <- "https://api.openweathermap.org/data/2.5/onecall?lat=47.9936&lon=-122.88248&exclude=minutely&units=imperial&appid=8d5cf85099c375dcad074eff91b0d5d9"
+d.weather.page <- fromJSON(url, flatten = TRUE)
+hourly.forecast <- data.frame(d.weather.page$hourly)
+hourly.forecast$dt <- as.POSIXct(hourly.forecast$dt, origin="1970-01-01")
+
+current <- data.frame(d.weather.page$current)
+current$dt <- as.POSIXct(current$dt, origin="1970-01-01")
+current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
+current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
+
+current <- current %>%
+  mutate(wind_speed = wind_speed * 0.868976) %>%
+  mutate(wind_gust = wind_gust * 0.868976)
+
+hourly.forecast <- hourly.forecast %>%
+  mutate(wind_speed = wind_speed * 0.868976) %>%
+  mutate(wind_gust = wind_gust * 0.868976)
+
+d.shade <- data.frame(dusk = seq.POSIXt(current$sunset, by = 'day', length.out = 3), 
+                    dawn = seq.POSIXt(current$sunrise+86400, by = 'day', length.out = 3),
+                    top = Inf,
+                    bottom = -Inf)
+
+d.shade <- d.shade %>% 
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. > tail(hourly.forecast$dt, 1)), tail(hourly.forecast$dt, 1))) %>%
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. < head(hourly.forecast$dt, 1)), head(hourly.forecast$dt, 1)))
+
+
+d.rose <- ggplot(current, aes(x = wind_deg)) +
+  coord_polar(theta = "x", start = 0, direction = 1) +
+  geom_histogram(fill = "red", color = "gray10", bins = 30) +
+  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
+                     labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.title = element_blank())
+
+d.dir.plot <- ggplot() +
+  geom_rect(data = d.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_point(data = hourly.forecast, aes(x = dt, y = wind.rose(wind_deg)), size = 1) +
+  theme_bw() +
+  labs(title = "**Wind Direction**") +
+  theme(plot.title = element_markdown()) +
+  ylab("") +
+  xlab("") +
+  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
+  scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
+
+
+d.bar.plot <- ggplot() + 
+  geom_rect(data = d.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = hourly.forecast, aes(x = dt, y = pressure), size = 1) +
+  geom_hline(aes(yintercept = 1013.25), linetype = "dashed", color = "gray") +
+  theme_bw() +
+  labs(title = "**Barometric Pressure**") +
+  theme(plot.title = element_markdown()) +
+  ylab("Millibars") +
+  xlab("") +
+  scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
+
+
+d.weather.plot <- ggplot() +
+  geom_rect(data = d.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = hourly.forecast, aes(x = dt, y = wind_speed), size = 1) +
+  geom_line(data = hourly.forecast, aes(x = dt, y = wind_gust), color = "#FF0000") +
+  theme_bw() +
+  labs(
+    title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
+  theme(plot.title = element_markdown()) +
+  ylab("Knots") +
+  xlab("") + 
+  scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
+
+
+d.rain.plot <- ggplot() +
+  geom_rect(data = d.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = hourly.forecast, aes(x = dt, y = pop), size = 1) +
+  geom_col(data = hourly.forecast, aes(x = dt, y = rain.1h/5), color = "darkgrey", fill = "#28d0eb") +
+  geom_text(data = hourly.forecast, aes(x = dt, y = rain.1h/5, label = rain.1h), size = 2, vjust = -0.5) +
+  theme_bw() +
+  labs(
+    title = "**Chance of Rain** and <span style='color:#28d0eb;'>**Accumulation**</span></span> (mm)") +
+  theme(plot.title = element_markdown()) +
+  ylab("Percent") + 
+  xlab("") +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  coord_cartesian(ylim = c(0,1)) +
+  scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
+
+
+
 # Ediz Hook chunk
 
 # Query and clean data
@@ -46,23 +151,49 @@ weather.table$Time <- as.POSIXct(weather.table$Time, format = "%Y-%m-%dT%H:%M:%S
 dir.table$Time <- as.POSIXct(dir.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
 pressure.table$Time <- as.POSIXct(pressure.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
 
-dir.plot <- ggplot(dir.table, aes(x = Time)) + 
-  geom_point(aes(y = wind.rose(`Wind Direction`)), size = 1) +
+shade <- data.frame(dusk = seq.POSIXt(current$sunset-172800, by = 'day', length.out = 3), 
+                      dawn = seq.POSIXt(current$sunrise-86400, by = 'day', length.out = 3),
+                      top = Inf,
+                      bottom = -Inf)
+
+e.dir.shade <- shade %>% 
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. > tail(dir.table$Time, 1)), tail(dir.table$Time, 1))) %>%
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. < head(dir.table$Time, 1)), head(dir.table$Time, 1)))
+
+dir.plot <- ggplot() + 
+  geom_rect(data = e.dir.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_point(data = dir.table, aes(x = Time, y = wind.rose(`Wind Direction`)), size = 1) +
   theme_bw() +
   labs(title = "**Wind Direction**") +
   theme(plot.title = element_markdown()) +
   ylab("") +
   xlab("") +
-  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N'))
+  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
+  scale_x_datetime(limits = c(min(dir.table$Time), max(dir.table$Time)), expand = c(0, 0))
 
-bar.plot <- ggplot(pressure.table, aes(x = Time)) + 
-  geom_line(aes(y = `Pressure (mb)`), size = 1) +
+e.bar.shade <- shade %>% 
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. > tail(pressure.table$Time, 1)), tail(pressure.table$Time, 1))) %>%
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. < head(pressure.table$Time, 1)), head(pressure.table$Time, 1)))
+
+
+bar.plot <- ggplot() + 
+  geom_rect(data = e.bar.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = pressure.table, aes(x = Time, y = `Pressure (mb)`), size = 1) +
   geom_hline(aes(yintercept = 1013.25), linetype = "dashed", color = "gray") +
   theme_bw() +
   labs(title = "**Barometric Pressure**") +
   theme(plot.title = element_markdown()) +
   ylab("Millibars") +
-  xlab("")
+  xlab("") +
+  scale_x_datetime(limits = c(min(pressure.table$Time), max(pressure.table$Time)), expand = c(0, 0))
 
 rose <- ggplot(tail(dir.table, 1), aes(x = `Wind Direction`)) +
   coord_polar(theta = "x", start = 0, direction = 1) +
@@ -74,6 +205,12 @@ rose <- ggplot(tail(dir.table, 1), aes(x = `Wind Direction`)) +
   theme(
     axis.text.y = element_blank(),
     axis.title = element_blank())
+
+e.shade <- shade %>% 
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. > tail(weather.table$Time, 1)), tail(weather.table$Time, 1))) %>%
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. < head(weather.table$Time, 1)), head(weather.table$Time, 1)))
 
 # Catch errors due to missing gust data
 
@@ -90,19 +227,24 @@ a <- try({
       title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
     theme(plot.title = element_markdown()) +
     scale_y_continuous(breaks = seq(0, max(na.omit(gust.table$`Wind Speed`)),5)) +
+    scale_x_datetime(limits = c(min(weather.table$Time), max(weather.table$Time)), expand = c(0, 0)) +
     ylab("Knots") +
     xlab("")
 })
 
 if (class(a) == "try-error") {
   
-  weather.plot <- ggplot(weather.table, aes(x = Time)) +
-    geom_line(aes(y = `Wind Speed`), size = 1) +
+  weather.plot <- ggplot() +
+    geom_rect(data = e.shade, 
+              aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+              fill = 'light grey', alpha = 0.5) +
+    geom_line(data = weather.table, aes(x = Time, y = `Wind Speed`), size = 1) +
     theme_bw() +
     labs(
       title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
     theme(plot.title = element_markdown()) +
-    scale_y_continuous(breaks = seq(0, max(weather.table$`Wind Speed`),1)) +
+    scale_y_continuous(breaks = seq(0, max(weather.table$`Wind Speed`),5)) +
+    scale_x_datetime(limits = c(min(weather.table$Time), max(weather.table$Time)), expand = c(0, 0)) +
     ylab("Knots") +
     xlab("")
 }
@@ -135,26 +277,42 @@ weather <- weather[1:240,] %>%
   mutate(Wind.Speed = Wind.Speed * 1.94384) %>%
   mutate(Gust = Gust *1.94384)
 
+pt.shade <- shade %>% 
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. < tail(weather$Time, 1)), tail(weather$Time, 1))) %>%
+  mutate_at(vars(dusk, dawn),
+            ~ replace(., which(. > head(weather$Time, 1)), head(weather$Time, 1)))
+
 
 # Build plots 
 
-pt.dir.plot <- ggplot(weather, aes(x = Time)) + 
-  geom_point(aes(y = wind.rose(Wind.Dir)), size = 1) +
+pt.dir.plot <- ggplot() + 
+  geom_rect(data = pt.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_point(data = weather, aes(x = Time, y = wind.rose(Wind.Dir)), size = 1) +
   theme_bw() +
   labs(title = "**Wind Direction**") +
   theme(plot.title = element_markdown()) +
   ylab("") +
   xlab("") +
-  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N'))
+  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
+  scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0))
 
-pt.bar.plot <- ggplot(weather, aes(x = Time)) + 
-  geom_line(aes(y = Pressure), size = 1) +
+
+pt.bar.plot <- ggplot() + 
+  geom_rect(data = pt.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = weather, aes(x = Time, y = Pressure), size = 1) +
   geom_hline(aes(yintercept = 1013.25), linetype = "dashed", color = "gray") +
   theme_bw() +
   labs(title = "**Barometric Pressure**") +
   theme(plot.title = element_markdown()) +
   ylab("Millibars") +
-  xlab("")
+  xlab("") +
+  scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0))
+
 
 pt.rose <- ggplot(first(na.omit(weather[,1:3])), aes(x = Wind.Dir)) +
   coord_polar(theta = "x", start = 0, direction = 1) +
@@ -172,89 +330,20 @@ if (any(is.na(weather$Gust)) == TRUE){
     drop_na(Gust)
 }
 
-pt.weather.plot <- ggplot(weather, aes(x =Time)) + 
-  geom_line(aes(y = Wind.Speed), size = 1) +
-  geom_line(aes(y = Gust), color = "#FF0000") +
+pt.weather.plot <- ggplot() + 
+  geom_rect(data = pt.shade, 
+            aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+            fill = 'light grey', alpha = 0.5) +
+  geom_line(data = weather, aes(x = Time, y = Wind.Speed), size = 1) +
+  geom_line(data = weather, aes(x = Time, y = Gust), color = "#FF0000") +
   theme_bw() +
   labs(
     title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
   theme(plot.title = element_markdown()) +
   scale_y_continuous(breaks = seq(0, max(weather$Gust), 5)) +
+  scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0)) +
   ylab("Knots") +
   xlab("")
-
-
-# Disco Bay chunk 
-
-url <- "https://api.openweathermap.org/data/2.5/onecall?lat=47.9936&lon=-122.88248&exclude=minutely&units=imperial&appid=8d5cf85099c375dcad074eff91b0d5d9"
-d.weather.page <- fromJSON(url, flatten = TRUE)
-hourly.forecast <- data.frame(d.weather.page$hourly)
-hourly.forecast$dt <- as.POSIXct(hourly.forecast$dt, origin="1970-01-01")
-
-current <- data.frame(d.weather.page$current)
-current$dt <- as.POSIXct(current$dt, origin="1970-01-01")
-current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
-current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
-
-current <- current %>%
-  mutate(wind_speed = wind_speed * 0.868976) %>%
-  mutate(wind_gust = wind_gust * 0.868976)
-
-hourly.forecast <- hourly.forecast %>%
-  mutate(wind_speed = wind_speed * 0.868976) %>%
-  mutate(wind_gust = wind_gust * 0.868976)
-
-d.rose <- ggplot(current, aes(x = wind_deg)) +
-  coord_polar(theta = "x", start = 0, direction = 1) +
-  geom_histogram(fill = "red", color = "gray10", bins = 30) +
-  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
-                     labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
-                                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
-  theme_minimal() +
-  theme(
-    axis.text.y = element_blank(),
-    axis.title = element_blank())
-
-d.dir.plot <- ggplot(hourly.forecast, aes(x = dt)) + 
-  geom_point(aes(y = wind.rose(wind_deg)), size = 1) +
-  theme_bw() +
-  labs(title = "**Wind Direction**") +
-  theme(plot.title = element_markdown()) +
-  ylab("") +
-  xlab("") +
-  scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N'))
-
-d.bar.plot <- ggplot(hourly.forecast, aes(x = dt)) + 
-  geom_line(aes(y = pressure), size = 1) +
-  geom_hline(aes(yintercept = 1013.25), linetype = "dashed", color = "gray") +
-  theme_bw() +
-  labs(title = "**Barometric Pressure**") +
-  theme(plot.title = element_markdown()) +
-  ylab("Millibars") +
-  xlab("")  
-
-d.weather.plot <- ggplot(hourly.forecast, aes(x =dt)) + 
-  geom_line(aes(y = wind_speed), size = 1) +
-  geom_line(aes(y = wind_gust), color = "#FF0000") +
-  theme_bw() +
-  labs(
-    title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
-  theme(plot.title = element_markdown()) +
-  ylab("Knots") +
-  xlab("")
-
-d.rain.plot <- ggplot(hourly.forecast, aes(x = dt)) +
-  geom_line(aes(y = pop), size = 1) +
-  geom_col(aes(y = rain.1h/5), color = "darkgrey", fill = "#28d0eb") +
-  geom_text(aes(y = rain.1h/5, label = rain.1h), size = 2.5, vjust = -0.5) +
-  theme_bw() +
-  labs(
-    title = "**Chance of Rain** and <span style='color:#28d0eb;'>**Accumulation**</span></span> (mm)") +
-  theme(plot.title = element_markdown()) +
-  ylab("Percent") + 
-  xlab("") +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  coord_cartesian(ylim = c(0,1))
 
 
 ui <- tabsetPanel(
