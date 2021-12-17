@@ -1,6 +1,5 @@
 library(tidyverse)
 library(shiny)
-library(curl)
 library(jsonlite)
 library(ggtext)
 library(data.table)
@@ -31,8 +30,7 @@ current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
 current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
 
 current <- current %>%
-  mutate(wind_speed = wind_speed * 0.868976) %>%
-  mutate(wind_gust = wind_gust * 0.868976)
+  mutate(wind_speed = wind_speed * 0.868976)
 
 hourly.forecast <- hourly.forecast %>%
   mutate(wind_speed = wind_speed * 0.868976) %>%
@@ -219,9 +217,12 @@ a <- try({
   gust.table$Time <- as.POSIXct(gust.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
   gust.table$Time <- gust.table$Time
   
-  weather.plot <- ggplot(NULL, aes(Time, `Wind Speed`)) + 
-    geom_line(data = weather.table, color = "black", size = 1) +
-    geom_point(data = gust.table, color = "#FF0000") +
+  weather.plot <- ggplot() + 
+    geom_rect(data = e.shade, 
+              aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+              fill = 'light grey', alpha = 0.5) +
+    geom_line(data = weather.table, aes(x = Time, y = `Wind Speed`), color = "black", size = 1) +
+    geom_point(data = gust.table, aes(x = Time, y = `Wind Speed`), color = "#FF0000") +
     theme_bw() +
     labs(
       title = "**Wind Speed** and <span style='color:#FF0000;'>**Gust**</span></span>") +
