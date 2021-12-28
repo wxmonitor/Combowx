@@ -6,7 +6,7 @@ library(data.table)
 library(lubridate)
 library(scales)
 
-###### Combo app #########
+###### Combowx monitor full #########
 
 Sys.setenv(TZ="America/Los_Angeles")
 
@@ -101,6 +101,7 @@ d.weather.plot <- ggplot() +
   xlab("") + 
   scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 
+if ("rain.1h" %in% colnames(hourly.forecast)) {
 
 d.rain.plot <- ggplot() +
   geom_rect(data = d.shade, 
@@ -119,6 +120,22 @@ d.rain.plot <- ggplot() +
   coord_cartesian(ylim = c(0,1)) +
   scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 
+} else (
+  d.rain.plot <- ggplot() +
+    geom_rect(data = d.shade, 
+              aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
+              fill = 'light grey', alpha = 0.5) +
+    geom_line(data = hourly.forecast, aes(x = dt, y = pop), size = 1) +
+    theme_bw() +
+    labs(
+      title = "**Chance of Rain** and <span style='color:#28d0eb;'>**Accumulation**</span></span> (mm)") +
+    theme(plot.title = element_markdown()) +
+    ylab("Percent") + 
+    xlab("") +
+    scale_y_continuous(labels = percent_format(accuracy = 1)) +
+    coord_cartesian(ylim = c(0,1)) +
+    scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
+)
 
 
 # Ediz Hook chunk
