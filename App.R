@@ -378,8 +378,8 @@ pt.weather.plot <- ggplot() +
 ui <- tabsetPanel(
   tabPanel("Disco Bay",
            fluidPage(
-             h1("Disco Bay Weather", align = "center"),
-             h3("48 hour forecast", align = "center"),
+             h5("WX Monitor", align = "center"),
+             h3("Disco Bay 48 hour forecast", align = "center"),
              h4(textOutput("d.time.current"), align = "center"),
              h4(textOutput("d.weather.label"), align = "center"),
              fluidRow(column(12, align = "center",
@@ -392,7 +392,8 @@ ui <- tabsetPanel(
   ),
   tabPanel("PT Ferry",
            fluidPage(
-             h1("Port Townsend Ferry Dock Weather", align = "center"),
+             h5("WX Monitor", align = "center"),
+             h3("Port Townsend Ferry Dock Reports", align = "center"),
              h4(textOutput("pt.time.current"), align = "center"),
              h4(textOutput("pt.time.label"), align = "center"),
              h4(textOutput("pt.weather.label"), align = "center"),
@@ -405,7 +406,8 @@ ui <- tabsetPanel(
   ),
   tabPanel("Ediz Hook",
            fluidPage(
-             h1("Ediz Hook Weather", align = "center"),
+             h5("WX Monitor", align = "center"),
+             h3("Ediz Hook Reports", align = "center"),
              h4(textOutput("time.current"), align = "center"),
              h4(textOutput("time.label"), align = "center"),
              h4(textOutput("weather.label"), align = "center"),
@@ -433,7 +435,7 @@ server <- function(input, output) {
   }) 
   
   output$d.time.current <- renderText({
-    paste("",Sys.time())
+    paste("",format(Sys.time(), "%a %m-%d %H:%M"))
   })
   
   
@@ -460,11 +462,11 @@ server <- function(input, output) {
   }) 
   
   output$pt.time.current <- renderText({
-    paste("Current time:", Sys.time())
+    paste("Current time:", format(Sys.time(), "%m-%d %H:%M"))
   })
   
   output$pt.time.label <- renderText({
-    paste("Last reading:", first(na.omit(weather$Time)))
+    paste("Last reading:", format(first(na.omit(weather$Time)), "%m-%d %H:%M"))
   }) 
   
   output$pt.weather.label <- renderText({
@@ -491,11 +493,11 @@ server <- function(input, output) {
   }) 
   
   output$time.current <- renderText({
-    paste("Current time:", Sys.time())
+    paste("Current time:", format(Sys.time(), "%m-%d %H:%M"))
   })
   
   output$time.label <- renderText({
-    paste("Last reading:", tail(weather.table$Time, 1))
+    paste("Last reading:", format(tail(weather.table$Time, 1), "%m-%d %H:%M"))
   }) 
   
   output$weather.label <- renderText({
