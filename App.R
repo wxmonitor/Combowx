@@ -30,7 +30,11 @@ current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
 current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
 
 current <- current %>%
-  mutate(wind_speed = wind_speed * 0.868976)
+  mutate(wind_speed = wind_speed * 0.868976) %>%
+  mutate(wind_deg = as.integer(wind_deg)) %>%
+  mutate(mod_deg = case_when(wind_deg > 352 && wind_deg < 356 ~ 352L,
+                             wind_deg >= 356 && wind_deg <= 360 ~ 0L,
+                             TRUE ~ wind_deg))
 
 hourly.forecast <- hourly.forecast %>%
   mutate(wind_speed = wind_speed * 0.868976) %>%
@@ -48,10 +52,10 @@ d.shade <- d.shade %>%
             ~ replace(., which(. < head(hourly.forecast$dt, 1)), head(hourly.forecast$dt, 1)))
 
 
-d.rose <- ggplot(current, aes(x = wind_deg)) +
-  coord_polar(theta = "x", start = 0, direction = 1) +
-  geom_histogram(fill = "red", color = "gray10", bins = 30) +
-  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
+d.rose <- ggplot(current, aes(x = mod_deg)) +
+  coord_polar(theta = "x", start = -pi/45, direction = 1) +
+  geom_bar(width = 7, color = "gray10", fill = "red") +
+  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(-4, 356), 
                      labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
                                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
   theme_minimal() +
@@ -166,6 +170,11 @@ weather.table$Time <- as.POSIXct(weather.table$Time, format = "%Y-%m-%dT%H:%M:%S
 dir.table$Time <- as.POSIXct(dir.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
 pressure.table$Time <- as.POSIXct(pressure.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
 
+dir.table <- dir.table %>%
+  mutate(`Mod Direction` = case_when(`Wind Direction` > 352 && `Wind Direction` < 356 ~ 352,
+                                   `Wind Direction` >= 356 && `Wind Direction` <= 360 ~ 0,
+                                   TRUE ~ `Wind Direction`))
+
 shade <- data.frame(dusk = seq.POSIXt(current$sunset-172800, by = 'day', length.out = 3), 
                       dawn = seq.POSIXt(current$sunrise-86400, by = 'day', length.out = 3),
                       top = Inf,
@@ -210,10 +219,10 @@ bar.plot <- ggplot() +
   xlab("") +
   scale_x_datetime(limits = c(min(pressure.table$Time), max(pressure.table$Time)), expand = c(0, 0))
 
-rose <- ggplot(tail(dir.table, 1), aes(x = `Wind Direction`)) +
-  coord_polar(theta = "x", start = 0, direction = 1) +
-  geom_histogram(fill = "red", color = "gray10", bins = 30) +
-  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
+rose <- ggplot(tail(dir.table, 1), aes(x = `Mod Direction`)) +
+  coord_polar(theta = "x", start = -pi/45, direction = 1) +
+  geom_bar(width = 7, color = "gray10", fill = "red") +
+  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(-4, 356), 
                      labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
                                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
   theme_minimal() +
@@ -293,7 +302,9 @@ weather <- weather[1:240,] %>%
     dst(Time[1]) == TRUE ~ Time - 25200,
     dst(Time[1]) == FALSE ~ Time - 28800)) %>%
   mutate(Wind.Speed = Wind.Speed * 1.94384) %>%
-  mutate(Gust = Gust *1.94384)
+  mutate(Gust = Gust *1.94384) %>%
+  mutate(Mod.Dir = case_when(Wind.Dir > 350 ~  0,
+                             TRUE ~ Wind.Dir))
 
 pt.shade <- shade %>% 
   mutate_at(vars(dusk, dawn),
@@ -331,17 +342,17 @@ pt.bar.plot <- ggplot() +
   xlab("") +
   scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0))
 
-
-pt.rose <- ggplot(first(na.omit(weather[,1:3])), aes(x = Wind.Dir)) +
-  coord_polar(theta = "x", start = 0, direction = 1) +
-  geom_histogram(fill = "red", color = "gray10", bins = 30) +
-  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(0, 359), 
+pt.rose <- ggplot(first(na.omit(weather[,8])), aes(x = Mod.Dir)) +
+  coord_polar(theta = "x", start = -pi/45, direction = 1) +
+  geom_bar(width = 7, color = "gray10", fill = "red") +
+  scale_x_continuous(breaks = seq(0, 359, 22.5), limits = c(-4, 356), 
                      labels = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
                                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')) +
   theme_minimal() +
   theme(
     axis.text.y = element_blank(),
     axis.title = element_blank())
+
 
 if (any(is.na(weather$Gust)) == TRUE){
   weather <- weather %>%
