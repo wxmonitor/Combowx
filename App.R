@@ -8,8 +8,11 @@ library(scales)
 
 ###### Combowx monitor full #########
 
+
+# Force local time zone
 Sys.setenv(TZ="America/Los_Angeles")
 
+# Wind rose function to convert wind direction degrees to compass points
 wind.rose <- function(x) {
   upper <- seq(from = 11.25, by = 22.5, length.out = 17)
   card1 <- c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')
@@ -19,27 +22,25 @@ wind.rose <- function(x) {
 
 # Disco Bay chunk - runs first to get sunrise/sunset data
 
+# Call API and decode JSON
 url <- "https://api.openweathermap.org/data/2.5/onecall?lat=47.9936&lon=-122.88248&exclude=minutely&units=imperial&appid=8d5cf85099c375dcad074eff91b0d5d9"
 d.weather.page <- fromJSON(url, flatten = TRUE)
-hourly.forecast <- data.frame(d.weather.page$hourly)
-hourly.forecast$dt <- as.POSIXct(hourly.forecast$dt, origin="1970-01-01")
 
-current <- data.frame(d.weather.page$current)
-current$dt <- as.POSIXct(current$dt, origin="1970-01-01")
-current$sunrise <- as.POSIXct(current$sunrise, origin="1970-01-01")
-current$sunset <- as.POSIXct(current$sunset, origin="1970-01-01")
+# Strip and format hourly data
+hourly.forecast <- data.frame(d.weather.page$hourly) %>%
+  mutate(dt = as.POSIXct(dt, origin="1970-01-01")) %>%
+  mutate_at(vars(wind_speed, wind_gust), ~ . * 0.868976)
 
-current <- current %>%
+# Strip and format current data
+current <- data.frame(d.weather.page$current) %>%
+  mutate_at(vars(dt, sunrise, sunset), ~ as.POSIXct(., origin="1970-01-01")) %>%
   mutate(wind_speed = wind_speed * 0.868976) %>%
   mutate(wind_deg = as.integer(wind_deg)) %>%
   mutate(mod_deg = case_when(wind_deg > 352 && wind_deg < 356 ~ 352L,
                              wind_deg >= 356 && wind_deg <= 360 ~ 0L,
                              TRUE ~ wind_deg))
 
-hourly.forecast <- hourly.forecast %>%
-  mutate(wind_speed = wind_speed * 0.868976) %>%
-  mutate(wind_gust = wind_gust * 0.868976)
-
+# Create night-time shade limits
 d.shade <- data.frame(dusk = seq.POSIXt(current$sunset, by = 'day', length.out = 3), 
                     dawn = seq.POSIXt(current$sunrise+86400, by = 'day', length.out = 3),
                     top = Inf,
@@ -51,7 +52,7 @@ d.shade <- d.shade %>%
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. < head(hourly.forecast$dt, 1)), head(hourly.forecast$dt, 1)))
 
-
+# Wind rose plot
 d.rose <- ggplot(current, aes(x = mod_deg)) +
   coord_polar(theta = "x", start = -pi/45, direction = 1) +
   geom_bar(width = 7, color = "gray10", fill = "red") +
@@ -63,6 +64,7 @@ d.rose <- ggplot(current, aes(x = mod_deg)) +
     axis.text.y = element_blank(),
     axis.title = element_blank())
 
+# Wind direction plot
 d.dir.plot <- ggplot() +
   geom_rect(data = d.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -76,7 +78,7 @@ d.dir.plot <- ggplot() +
   scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
   scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 
-
+# Barometer plot
 d.bar.plot <- ggplot() + 
   geom_rect(data = d.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -90,7 +92,7 @@ d.bar.plot <- ggplot() +
   xlab("") +
   scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 
-
+# Wind plot
 d.weather.plot <- ggplot() +
   geom_rect(data = d.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -105,6 +107,7 @@ d.weather.plot <- ggplot() +
   xlab("") + 
   scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 
+# Rain plot
 if ("rain.1h" %in% colnames(hourly.forecast)) {
 
 d.rain.plot <- ggplot() +
@@ -141,51 +144,42 @@ d.rain.plot <- ggplot() +
     scale_x_datetime(limits = c(min(hourly.forecast$dt), max(hourly.forecast$dt)), expand = c(0, 0))
 )
 
-
 # Ediz Hook chunk
 
-# Query and clean data
+# Call API and decode JSON
+url <- "https://api.synopticdata.com/v2/stations/timeseries?stid=KNOW&obtimezone=local&recent=1440&vars=wind_speed,wind_gust,wind_direction,sea_level_pressure&units=english&token=652e4bd32bbf4621b835895f8c769bb6"
+total.page <- fromJSON(url, flatten = TRUE)
 
-url <- "https://api.synopticdata.com/v2/stations/timeseries?stid=KNOW&obtimezone=local&recent=1440&vars=wind_speed&units=english&token=652e4bd32bbf4621b835895f8c769bb6"
-weather.page <- fromJSON(url, flatten = TRUE)
-weather.table <- data.frame(weather.page[["STATION"]][16][[1]], weather.page[["STATION"]][17][[1]])
+# Strip and format data
+weather.table <- data.frame(total.page[["STATION"]]$OBSERVATIONS.date_time, total.page[["STATION"]]$OBSERVATIONS.wind_speed_set_1) %>%
+  setNames(c("Time", "Wind Speed")) %>%
+  mutate(Time = as.POSIXct(Time, format = "%Y-%m-%dT%H:%M:%S%z"))
 
-url <- "https://api.synopticdata.com/v2/stations/timeseries?stid=KNOW&obtimezone=local&recent=1440&vars=wind_gust&units=english&token=652e4bd32bbf4621b835895f8c769bb6"
-gust.page <- fromJSON(url, flatten = TRUE)
-gust.table <- data.frame(gust.page[["STATION"]][16][[1]], gust.page[["STATION"]][17][[1]])
-
-url <- "https://api.synopticdata.com/v2/stations/timeseries?stid=KNOW&obtimezone=local&recent=1440&vars=wind_direction&units=english&token=652e4bd32bbf4621b835895f8c769bb6"
-dir.page <- fromJSON(url, flatten = TRUE)
-dir.table <- data.frame(dir.page[["STATION"]][16][[1]], dir.page[["STATION"]][17][[1]])
-
-url <- "https://api.synopticdata.com/v2/stations/timeseries?stid=KNOW&obtimezone=local&recent=720&vars=sea_level_pressure&units=english&token=652e4bd32bbf4621b835895f8c769bb6"
-pressure.page <- fromJSON(url, flatten = TRUE)
-pressure.table <- data.frame(pressure.page[["STATION"]][17][[1]], pressure.page[["STATION"]][18][[1]])
-
-names(weather.table) <- c("Time", "Wind Speed")
-names(dir.table) <- c("Time", "Wind Direction")
-names(pressure.table) <- c("Time", "Pressure (mb)")
-
-weather.table$Time <- as.POSIXct(weather.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
-dir.table$Time <- as.POSIXct(dir.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
-pressure.table$Time <- as.POSIXct(pressure.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
-
-dir.table <- dir.table %>%
+dir.table <- data.frame(total.page[["STATION"]]$OBSERVATIONS.date_time, total.page[["STATION"]]$OBSERVATIONS.wind_direction_set_1) %>%
+  setNames(c("Time", "Wind Direction")) %>%
+  mutate(Time = as.POSIXct(Time, format = "%Y-%m-%dT%H:%M:%S%z")) %>%
   mutate(`Mod Direction` = case_when(`Wind Direction` > 352 && `Wind Direction` < 356 ~ 352,
-                                   `Wind Direction` >= 356 && `Wind Direction` <= 360 ~ 0,
-                                   TRUE ~ `Wind Direction`))
+                                     `Wind Direction` >= 356 && `Wind Direction` <= 360 ~ 0,
+                                     TRUE ~ `Wind Direction`))
 
+pressure.table <- data.frame(pressure.page[["STATION"]]$OBSERVATIONS.date_time, pressure.page[["STATION"]]$OBSERVATIONS.sea_level_pressure_set_1d) %>%
+  setNames(c("Time", "Pressure (mb)")) %>%
+  mutate(Time = as.POSIXct(Time, format = "%Y-%m-%dT%H:%M:%S%z"))
+
+# Create night-time shade limits
 shade <- data.frame(dusk = seq.POSIXt(current$sunset-172800, by = 'day', length.out = 3), 
                       dawn = seq.POSIXt(current$sunrise-86400, by = 'day', length.out = 3),
                       top = Inf,
                       bottom = -Inf)
 
+# Ediz Hook direction shade limits
 e.dir.shade <- shade %>% 
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. > tail(dir.table$Time, 1)), tail(dir.table$Time, 1))) %>%
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. < head(dir.table$Time, 1)), head(dir.table$Time, 1)))
 
+# Wind direction plot
 dir.plot <- ggplot() + 
   geom_rect(data = e.dir.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -199,13 +193,14 @@ dir.plot <- ggplot() +
   scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
   scale_x_datetime(limits = c(min(dir.table$Time), max(dir.table$Time)), expand = c(0, 0))
 
+# Ediz Hook barometer shade limits
 e.bar.shade <- shade %>% 
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. > tail(pressure.table$Time, 1)), tail(pressure.table$Time, 1))) %>%
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. < head(pressure.table$Time, 1)), head(pressure.table$Time, 1)))
 
-
+# Barometer plot
 bar.plot <- ggplot() + 
   geom_rect(data = e.bar.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -219,6 +214,7 @@ bar.plot <- ggplot() +
   xlab("") +
   scale_x_datetime(limits = c(min(pressure.table$Time), max(pressure.table$Time)), expand = c(0, 0))
 
+# Wind rose
 rose <- ggplot(tail(dir.table, 1), aes(x = `Mod Direction`)) +
   coord_polar(theta = "x", start = -pi/45, direction = 1) +
   geom_bar(width = 7, color = "gray10", fill = "red") +
@@ -230,6 +226,7 @@ rose <- ggplot(tail(dir.table, 1), aes(x = `Mod Direction`)) +
     axis.text.y = element_blank(),
     axis.title = element_blank())
 
+# Ediz Hook wind shade limits
 e.shade <- shade %>% 
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. > tail(weather.table$Time, 1)), tail(weather.table$Time, 1))) %>%
@@ -239,10 +236,13 @@ e.shade <- shade %>%
 # Catch errors due to missing gust data
 
 a <- try({
-  names(gust.table) <- c("Time", "Wind Speed")
-  gust.table$Time <- as.POSIXct(gust.table$Time, format = "%Y-%m-%dT%H:%M:%S%z")
+  gust.table <- data.frame(total.page[["STATION"]]$OBSERVATIONS.date_time, total.page[["STATION"]]$OBSERVATIONS.wind_gust_set_1) %>%
+    setNames(c("Time", "Wind Speed")) %>%
+    mutate(Time = as.POSIXct(Time, format = "%Y-%m-%dT%H:%M:%S%z"))
+  
   gust.table$Time <- gust.table$Time
   
+  # Wind + gust plot
   weather.plot <- ggplot() + 
     geom_rect(data = e.shade, 
               aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -261,6 +261,7 @@ a <- try({
 
 if (class(a) == "try-error") {
   
+  # Wind only plot
   weather.plot <- ggplot() +
     geom_rect(data = e.shade, 
               aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -279,8 +280,7 @@ if (class(a) == "try-error") {
 
 # PT Ferry Chunk
 
-# Query and clean data
-
+# Call API 
 weather <- fread("https://www.ndbc.noaa.gov/data/realtime2/PTWW1.txt", 
                  skip = 2,
                  na.strings = "MM",
@@ -291,6 +291,7 @@ weather <- fread("https://www.ndbc.noaa.gov/data/realtime2/PTWW1.txt",
                                "Wind.Speed", "Gust", NA, NA, NA, NA, "Pressure", 
                                "Air.Temp", "Water.Temp", NA, NA, NA, NA))
 
+# Subset past 24 hours of observations, clean and format data
 weather <- weather[1:240,] %>%
   select(c("Year", "Month", "Day", "Hour", "Minute", "Wind.Dir", "Wind.Speed",
            "Gust", "Pressure", "Air.Temp", "Water.Temp")) %>%
@@ -306,15 +307,14 @@ weather <- weather[1:240,] %>%
   mutate(Mod.Dir = case_when(Wind.Dir > 350 ~  0,
                              TRUE ~ Wind.Dir))
 
+# Create night-time shade limits
 pt.shade <- shade %>% 
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. < tail(weather$Time, 1)), tail(weather$Time, 1))) %>%
   mutate_at(vars(dusk, dawn),
             ~ replace(., which(. > head(weather$Time, 1)), head(weather$Time, 1)))
 
-
-# Build plots 
-
+# Wind direction plot
 pt.dir.plot <- ggplot() + 
   geom_rect(data = pt.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -328,7 +328,7 @@ pt.dir.plot <- ggplot() +
   scale_y_discrete(limits = c('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N')) +
   scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0))
 
-
+# Barometer plot
 pt.bar.plot <- ggplot() + 
   geom_rect(data = pt.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -342,6 +342,7 @@ pt.bar.plot <- ggplot() +
   xlab("") +
   scale_x_datetime(limits = c(min(weather$Time), max(weather$Time)), expand = c(0, 0))
 
+# Wind rose
 pt.rose <- ggplot(first(na.omit(weather[,8])), aes(x = Mod.Dir)) +
   coord_polar(theta = "x", start = -pi/45, direction = 1) +
   geom_bar(width = 7, color = "gray10", fill = "red") +
@@ -353,12 +354,13 @@ pt.rose <- ggplot(first(na.omit(weather[,8])), aes(x = Mod.Dir)) +
     axis.text.y = element_blank(),
     axis.title = element_blank())
 
-
+# Handle missing gust erros
 if (any(is.na(weather$Gust)) == TRUE){
   weather <- weather %>%
     drop_na(Gust)
 }
 
+# Wind plot
 pt.weather.plot <- ggplot() + 
   geom_rect(data = pt.shade, 
             aes(xmin = dusk, xmax = dawn, ymin = bottom, ymax = top), 
@@ -374,7 +376,7 @@ pt.weather.plot <- ggplot() +
   ylab("Knots") +
   xlab("")
 
-
+# Shiny UI
 ui <- tabsetPanel(
   tabPanel("Disco Bay",
            fluidPage(
@@ -420,9 +422,10 @@ ui <- tabsetPanel(
   )
 )
 
-
+# Shiny server
 server <- function(input, output) {
   
+  # Disco Bay current weather label
   output$d.weather.label <- renderText({
     paste0(wind.rose(current$wind_deg), " ",
            round(current$wind_speed, 0), " knots ",
@@ -430,45 +433,52 @@ server <- function(input, output) {
     
   }) 
   
+  # Disco Bay weather plot output
   output$d.weather.plot <- renderPlot({
     d.weather.plot
   }) 
   
+  # Disco Bay current time output
   output$d.time.current <- renderText({
     paste("",format(Sys.time(), "%a %m-%d %H:%M"))
   })
   
-  
+  # Disco Bay direction plot output
   output$d.dir.plot <- renderPlot({
     d.dir.plot
   })
   
-  
+  # Disco Bay rain plot output
   output$d.rain.plot <- renderPlot({
     d.rain.plot
   })
   
-  
+  # Disco Bay barometer plot output
   output$d.bar.plot <- renderPlot({
     d.bar.plot
   }) 
   
+  # Disco Bay wind rose output
   output$d.rose <- renderPlot({
     d.rose
   }) 
   
+  # PT wind plot output
   output$pt.weather.plot <- renderPlot({
     pt.weather.plot
   }) 
   
+  # PT current time output
   output$pt.time.current <- renderText({
     paste("Current time:", format(Sys.time(), "%m-%d %H:%M"))
   })
   
+  # PT last reading output
   output$pt.time.label <- renderText({
     paste("Last reading:", format(first(na.omit(weather$Time)), "%m-%d %H:%M"))
   }) 
   
+  # PT current weather label output
   output$pt.weather.label <- renderText({
     paste0(wind.rose(first(na.omit(weather$Wind.Dir))), " ",
            round(first(na.omit(weather$Wind.Speed)), 0), " knots ",
@@ -476,30 +486,37 @@ server <- function(input, output) {
     
   }) 
   
+  # PT wind direction plot output
   output$pt.dir.plot <- renderPlot({
     pt.dir.plot
   })
   
+  # PT barometer plot output
   output$pt.bar.plot <- renderPlot({
     pt.bar.plot
   }) 
   
+  # PT wind rose output
   output$pt.rose <- renderPlot({
     pt.rose
   })
   
+  # Ediz Hook wind plot output
   output$weather.plot <- renderPlot({
     weather.plot
   }) 
   
+  # Ediz Hook current time output
   output$time.current <- renderText({
     paste("Current time:", format(Sys.time(), "%m-%d %H:%M"))
   })
   
+  # Ediz Hook last reading output
   output$time.label <- renderText({
     paste("Last reading:", format(tail(weather.table$Time, 1), "%m-%d %H:%M"))
   }) 
   
+  # Ediz Hook current weather label output
   output$weather.label <- renderText({
     paste0(wind.rose(last(na.omit(dir.table$`Wind Direction`))), " ",
            last(na.omit(weather.table$`Wind Speed`)), " knots ",
@@ -507,14 +524,17 @@ server <- function(input, output) {
     
   }) 
   
+  # Ediz Hook wind direction plot output
   output$dir.plot <- renderPlot({
     dir.plot
   })
   
+  # Ediz Hook barometer plot output
   output$bar.plot <- renderPlot({
     bar.plot
   }) 
   
+  # Ediz Hook wind rose output
   output$rose <- renderPlot({
     rose
   })
