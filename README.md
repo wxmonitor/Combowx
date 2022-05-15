@@ -30,5 +30,5 @@
    
    
   Web app is deployed on shiny server running on remote ubuntu 18.04 server. 
-  Accesible at https://monitor.wxnw.net
+  Accesible at https://monitor.wxnw.net/geo
 
